@@ -1,0 +1,155 @@
+###
+# AI SQL Assistant - API Tests
+# Use the REST Client extension in VS Code to run these
+# Click "Send Request" above each request
+###
+
+@baseUrl = http://localhost:5001
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4ZTU5Mjg0NGM1NmIyNWQ1NzkzZjY5MyIsImlhdCI6MTc1OTg3NTcxNiwiZXhwIjoxNzYwNDgwNTE2fQ.q4xFg29AnFrZQveDBscMXVLcJixqWOwFfYBoXbGFEko 
+
+### Health Check
+GET {{baseUrl}}/health
+
+### ============================================================================
+### AUTHENTICATION
+### ============================================================================
+
+### 1. Register New User
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+### 2. Login (Copy the token from response and paste above in @token variable)
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+### 3. Get Current User Info
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### ============================================================================
+### DATABASE CONNECTIONS
+### ============================================================================
+
+### 4. Add Database Connection (Update with your Supabase credentials)
+POST {{baseUrl}}/api/connections/add
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nickname": "My Test Database",
+  "supabaseUrl": "https://xxxxx.supabase.co",
+  "supabaseAnonKey": "your-anon-key-here",
+  "supabaseServiceRoleKey": "your-service-role-key-here"
+}
+
+### 5. Get All Connections
+GET {{baseUrl}}/api/connections
+Authorization: Bearer {{token}}
+
+### 6. Get Specific Connection (replace :id with actual connection ID)
+GET {{baseUrl}}/api/connections/YOUR_CONNECTION_ID
+Authorization: Bearer {{token}}
+
+### 7. Update Connection (replace :id with actual connection ID)
+PUT {{baseUrl}}/api/connections/YOUR_CONNECTION_ID
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nickname": "Updated Database Name"
+}
+
+### 8. Delete Connection (replace :id with actual connection ID)
+DELETE {{baseUrl}}/api/connections/YOUR_CONNECTION_ID
+Authorization: Bearer {{token}}
+
+### ============================================================================
+### QUERY OPERATIONS
+### ============================================================================
+
+### 9. Prepare Schema (Cache it) - Replace with your connection ID
+POST {{baseUrl}}/api/query/prepare-schema
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "connectionId": "YOUR_CONNECTION_ID"
+}
+
+### 10. Generate and Execute SQL Query
+POST {{baseUrl}}/api/query/generate-sql
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "connectionId": "YOUR_CONNECTION_ID",
+  "naturalLanguageQuery": "Show me all users"
+}
+
+### 11. Execute Raw SQL (Advanced)
+POST {{baseUrl}}/api/query/execute-sql
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "connectionId": "YOUR_CONNECTION_ID",
+  "sql": "SELECT * FROM users LIMIT 10"
+}
+
+### ============================================================================
+### QUERY HISTORY
+### ============================================================================
+
+### 12. Get Query History (with pagination)
+GET {{baseUrl}}/api/history?page=1&limit=20
+Authorization: Bearer {{token}}
+
+### 13. Get Query History Filtered by Connection
+GET {{baseUrl}}/api/history?connectionId=YOUR_CONNECTION_ID
+Authorization: Bearer {{token}}
+
+### 14. Get Query History Filtered by Status
+GET {{baseUrl}}/api/history?status=success
+Authorization: Bearer {{token}}
+
+### 15. Get Specific Query by ID
+GET {{baseUrl}}/api/history/YOUR_QUERY_ID
+Authorization: Bearer {{token}}
+
+### 16. Delete Query from History
+DELETE {{baseUrl}}/api/history/YOUR_QUERY_ID
+Authorization: Bearer {{token}}
+
+### 17. Clear All Query History
+DELETE {{baseUrl}}/api/history
+Authorization: Bearer {{token}}
+
+### ============================================================================
+### TESTING WORKFLOW
+### ============================================================================
+### 
+### Step-by-Step Testing:
+### 1. Test Health Check (#1)
+### 2. Register a new user (#2)
+### 3. Login and copy the token (#3)
+### 4. Paste token in @token variable at top
+### 5. Get current user info (#4) - should work with token
+### 6. Add a database connection (#5) - use your Supabase credentials
+### 7. Get all connections (#6) - copy the connection _id
+### 8. Replace YOUR_CONNECTION_ID with the actual ID in remaining tests
+### 9. Test prepare schema (#10)
+### 10. Test AI query generation (#11)
+### 11. Check query history (#13)
+###
+### ============================================================================
