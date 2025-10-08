@@ -80,8 +80,6 @@ Generate a SQL query that answers the user's question.`;
       const result = await model.generateContent(prompt);
       const response = await result.response;
       generatedSQL = response.text().trim();
-      
-      console.log('🤖 Raw Gemini Response:', generatedSQL.substring(0, 200));
     } else {
       // Use OpenAI
       const response = await aiClient.client.chat.completions.create({
@@ -129,7 +127,6 @@ Generate a SQL query that answers the user's question.`;
 
     // Validate that it's a SELECT query
     if (!cleanedSQL.toUpperCase().startsWith('SELECT')) {
-      console.error('Generated SQL does not start with SELECT:', cleanedSQL.substring(0, 100));
       throw new Error('Generated query is not a SELECT statement');
     }
 

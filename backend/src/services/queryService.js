@@ -30,10 +30,9 @@ export const prepareSchema = async (connection, cache, cacheKey) => {
     const ttl = parseInt(process.env.SCHEMA_CACHE_TTL) || 600;
     cache.set(cacheKey, schemaString, ttl);
 
-    return schemaString;
+    return schemaContext;
   } catch (error) {
-    console.error('Error preparing schema:', error);
-    throw new Error('Failed to fetch database schema');
+    throw new Error(`Schema preparation failed: ${error.message}`);
   }
 };
 
@@ -53,8 +52,6 @@ export const generateAndExecuteQuery = async (naturalLanguageQuery, schemaContex
       naturalLanguageQuery,
       schemaContext
     );
-
-    console.log('🤖 AI Generated SQL:', generatedSQL);
 
     // Validate SQL for safety
     if (!validateSQLSafety(generatedSQL)) {

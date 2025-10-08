@@ -60,8 +60,6 @@ export const fetchDatabaseSchema = async (supabaseUrl, supabaseKey) => {
  * This introspects actual tables in the database
  */
 const buildSimpleSchemaFallback = async (supabase) => {
-  console.log('📦 Using fallback schema detection method');
-  
   // List of common table names to check
   const commonTables = ['students', 'courses', 'enrollments', 'teachers', 
                         'departments', 'grades', 'assignments', 'users'];
@@ -221,7 +219,6 @@ export const buildSimpleSchema = async (supabaseUrl, supabaseKey) => {
     }
 
     if (!data || data.length === 0) {
-      console.log('No tables found in information_schema, using fallback');
       return await buildDetailedSchemaFromIntrospection(supabase);
     }
 
@@ -261,8 +258,6 @@ export const buildSimpleSchema = async (supabaseUrl, supabaseKey) => {
  * Build schema by introspecting actual tables (fallback method)
  */
 const buildDetailedSchemaFromIntrospection = async (supabase) => {
-  console.log('📦 Using table introspection to build schema');
-  
   const commonTables = ['students', 'courses', 'enrollments', 'teachers', 
                         'departments', 'grades', 'assignments', 'users',
                         'student_course_performance', 'teacher_course_load'];
@@ -309,7 +304,6 @@ const buildDetailedSchemaFromIntrospection = async (supabase) => {
     return '-- No tables found. Please check your database connection and permissions.';
   }
   
-  console.log(`✅ Found ${foundTables} tables via introspection`);
   return schemaString;
 };
 
@@ -322,7 +316,6 @@ const buildDetailedSchemaFromIntrospection = async (supabase) => {
  */
 export const executeSQLQuery = async (supabaseUrl, supabaseKey, sql) => {
   try {
-    console.log('🔍 Executing SQL:', sql);
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Check if query has JOINs or complex features using regex (handles any whitespace/case)
@@ -334,10 +327,7 @@ export const executeSQLQuery = async (supabaseUrl, supabaseKey, sql) => {
     
     const isComplexQuery = hasJoin || hasSubquery || hasGroupBy || hasAggregates || hasComparison;
     
-    console.log(`📊 Query Analysis: hasJoin=${hasJoin}, hasSubquery=${hasSubquery}, hasGroupBy=${hasGroupBy}, hasAggregates=${hasAggregates}, hasComparison=${hasComparison}, isComplex=${isComplexQuery}`);
-    
     if (isComplexQuery) {
-      console.log('🔧 Complex query detected - using RPC function');
       
       // Remove trailing semicolon if present (RPC function wraps query in subquery)
       const cleanedSQL = sql.trim().replace(/;+\s*$/, '');
@@ -358,7 +348,6 @@ export const executeSQLQuery = async (supabaseUrl, supabaseKey, sql) => {
         throw new Error(error.message);
       }
 
-      console.log(`✅ Query executed successfully. Rows: ${data?.length || 0}`);
       return {
         success: true,
         data: data || [],
@@ -367,7 +356,6 @@ export const executeSQLQuery = async (supabaseUrl, supabaseKey, sql) => {
     }
     
     // For simple queries, use Supabase query builder
-    console.log('📊 Simple query - using Supabase query builder');
     const sqlOriginal = sql.trim();
     const sqlLower = sqlOriginal.toLowerCase();
     
@@ -397,7 +385,6 @@ export const executeSQLQuery = async (supabaseUrl, supabaseKey, sql) => {
       columns = columnList;
     }
     
-    console.log(`📊 Table: ${tableName}, Columns: ${columns}`);
     let query = supabase.from(tableName).select(columns);
     
     // Handle WHERE clauses (basic support)
@@ -433,7 +420,6 @@ export const executeSQLQuery = async (supabaseUrl, supabaseKey, sql) => {
       throw new Error(error.message);
     }
 
-    console.log(`✅ Query executed successfully. Rows: ${data?.length || 0}`);
     return {
       success: true,
       data,

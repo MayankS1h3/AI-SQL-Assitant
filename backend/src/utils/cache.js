@@ -33,8 +33,6 @@ class InMemoryCache {
     }, ttl * 1000);
 
     this.timers.set(key, timer);
-
-    console.log(`📦 Cache SET: ${key} (TTL: ${ttl}s)`);
   }
 
   /**
@@ -43,23 +41,19 @@ class InMemoryCache {
    * @returns {any|null} Cached value or null if not found/expired
    */
   get(key) {
-    const item = this.cache.get(key);
-
-    if (!item) {
-      console.log(`📦 Cache MISS: ${key}`);
+    const entry = this.cache.get(key);
+    
+    if (!entry) {
       return null;
     }
-
-    // Check if item has expired (double-check)
-    const now = Date.now();
-    if (now - item.timestamp > item.ttl) {
+    
+    // Check if entry is expired
+    if (Date.now() > entry.expiresAt) {
       this.delete(key);
-      console.log(`📦 Cache EXPIRED: ${key}`);
       return null;
     }
-
-    console.log(`📦 Cache HIT: ${key}`);
-    return item.value;
+    
+    return entry.value;
   }
 
   /**
@@ -75,9 +69,6 @@ class InMemoryCache {
 
     // Delete from cache
     const deleted = this.cache.delete(key);
-    if (deleted) {
-      console.log(`📦 Cache DELETE: ${key}`);
-    }
     return deleted;
   }
 
@@ -100,7 +91,6 @@ class InMemoryCache {
     
     // Clear cache
     this.cache.clear();
-    console.log('📦 Cache CLEARED');
   }
 
   /**
