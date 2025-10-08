@@ -54,6 +54,8 @@ export const generateAndExecuteQuery = async (naturalLanguageQuery, schemaContex
       schemaContext
     );
 
+    console.log('🤖 AI Generated SQL:', generatedSQL);
+
     // Validate SQL for safety
     if (!validateSQLSafety(generatedSQL)) {
       throw new Error('Generated query contains unsafe operations. Only SELECT queries are allowed.');

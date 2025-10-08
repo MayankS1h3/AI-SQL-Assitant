@@ -189,7 +189,7 @@ export const updateConnection = [
       await user.save();
 
       // Clear cached schema for this connection
-      const cacheKey = cache.generateSchemaKey(req.user._id.toString(), req.params.id);
+      const cacheKey = `schema:${req.user._id.toString()}:${req.params.id}`;
       cache.delete(cacheKey);
 
       res.status(200).json({
@@ -230,7 +230,7 @@ export const deleteConnection = async (req, res, next) => {
     await user.save();
 
     // Clear cached schema for this connection
-    const cacheKey = cache.generateSchemaKey(req.user._id.toString(), req.params.id);
+    const cacheKey = `schema:${req.user._id.toString()}:${req.params.id}`;
     cache.delete(cacheKey);
 
     res.status(200).json({

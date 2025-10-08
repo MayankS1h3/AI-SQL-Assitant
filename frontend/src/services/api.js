@@ -48,11 +48,9 @@ export const connectionsAPI = {
 };
 
 export const queryAPI = {
+  execute: (data) => api.post('/query/generate-sql', data),
   prepareSchema: (connectionId) => api.post('/query/prepare-schema', { connectionId }),
-  generateSQL: (connectionId, query) => 
-    api.post('/query/generate-sql', { connectionId, naturalLanguageQuery: query }),
-  executeSQL: (connectionId, sql) => 
-    api.post('/query/execute-sql', { connectionId, sql }),
+  executeRaw: (connectionId, sql) => api.post('/query/execute-sql', { connectionId, sql }),
 };
 
 export const historyAPI = {

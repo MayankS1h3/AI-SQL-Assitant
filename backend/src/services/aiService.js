@@ -1,18 +1,45 @@
 import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Lazy initialization of OpenAI client
-let openaiClient = null;
-
-const getOpenAIClient = () => {
-  if (!openaiClient) {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY environment variable is not set');
+/**
+ * Get the appropriate AI client based on configuration
+ * @returns {Object} AI client instance
+ */
+const getAIClient = () => {
+  const provider = process.env.AI_PROVIDER || 'openai';
+  
+  if (provider === 'gemini') {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY is not configured in environment variables');
     }
-    openaiClient = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
-    });
+    return {
+      provider: 'gemini',
+      client: new GoogleGenerativeAI(apiKey)
+    };
   }
-  return openaiClient;
+  
+  // Default to OpenAI
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENAI_API_KEY is not configured in environment variables');
+  }
+  return {
+    provider: 'openai',
+    client: new OpenAI({ apiKey })
+  };
+};
+
+/**
+ * Legacy function for backward compatibility
+ * @deprecated Use getAIClient instead
+ */
+const getOpenAIClient = () => {
+  const aiClient = getAIClient();
+  if (aiClient.provider !== 'openai') {
+    throw new Error('OpenAI client requested but different provider configured');
+  }
+  return aiClient.client;
 };
 
 /**
@@ -23,7 +50,8 @@ const getOpenAIClient = () => {
  */
 export const generateSQLFromNaturalLanguage = async (naturalLanguageQuery, schemaContext) => {
   try {
-    const openai = getOpenAIClient();
+    const aiClient = getAIClient();
+    
     const systemPrompt = `You are an expert PostgreSQL database assistant. Your task is to convert natural language questions into valid PostgreSQL SQL queries.
 
 IMPORTANT RULES:
@@ -42,26 +70,39 @@ ${schemaContext}
 
 Generate a SQL query that answers the user's question.`;
 
-    const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: naturalLanguageQuery
-        }
-      ],
-      temperature: 0.2, // Low temperature for more deterministic output
-      max_tokens: 500,
-      top_p: 1,
-      frequency_penalty: 0,
-      presence_penalty: 0
-    });
+    let generatedSQL;
 
-    const generatedSQL = response.choices[0].message.content.trim();
+    if (aiClient.provider === 'gemini') {
+      // Use Gemini 2.5 Flash - latest free tier model
+      const model = aiClient.client.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const prompt = `${systemPrompt}\n\nUser Question: ${naturalLanguageQuery}`;
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      generatedSQL = response.text().trim();
+    } else {
+      // Use OpenAI
+      const response = await aiClient.client.chat.completions.create({
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
+          {
+            role: 'user',
+            content: naturalLanguageQuery
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 500,
+        top_p: 1,
+        frequency_penalty: 0,
+        presence_penalty: 0
+      });
+
+      generatedSQL = response.choices[0].message.content.trim();
+    }
 
     // Remove markdown code blocks if present
     let cleanedSQL = generatedSQL
@@ -136,25 +177,40 @@ export const validateSQLSafety = (sql) => {
  */
 export const explainSQL = async (sql) => {
   try {
-    const openai = getOpenAIClient();
+    const aiClient = getAIClient();
     
-    const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a database expert. Explain SQL queries in simple, clear language that non-technical users can understand.'
-        },
-        {
-          role: 'user',
-          content: `Explain this SQL query in simple terms:\n\n${sql}`
-        }
-      ],
-      temperature: 0.3,
-      max_tokens: 200
-    });
+    let explanation;
 
-    return response.choices[0].message.content.trim();
+    if (aiClient.provider === 'gemini') {
+      // Use Gemini 2.5 Flash - latest free tier model
+      const model = aiClient.client.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const prompt = `You are a database expert. Explain SQL queries in simple, clear language that non-technical users can understand.\n\nExplain this SQL query in simple terms:\n\n${sql}`;
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      explanation = response.text().trim();
+    } else {
+      // Use OpenAI
+      const response = await aiClient.client.chat.completions.create({
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a database expert. Explain SQL queries in simple, clear language that non-technical users can understand.'
+          },
+          {
+            role: 'user',
+            content: `Explain this SQL query in simple terms:\n\n${sql}`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 200
+      });
+
+      explanation = response.choices[0].message.content.trim();
+    }
+
+    return explanation;
   } catch (error) {
     console.error('Error explaining SQL:', error);
     return 'Unable to generate explanation';

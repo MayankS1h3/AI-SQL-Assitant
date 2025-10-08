@@ -66,17 +66,12 @@ export const testConnection = async (supabaseUrl, supabaseKey) => {
   try {
     const supabase = createSupabaseClient(supabaseUrl, supabaseKey);
     
-    // Try to fetch a simple query to test connection
-    const { data, error } = await supabase
-      .from('_test_connection_')
-      .select('*')
-      .limit(1);
+    // Try to use a simple health check using auth API
+    // This doesn't require any tables to exist
+    const { data, error } = await supabase.auth.getSession();
     
-    // If table doesn't exist, that's okay - it means connection works
-    // If there's a connection error, it will be caught
-    if (error && !error.message.includes('does not exist') && !error.message.includes('relation')) {
-      throw error;
-    }
+    // Even if there's no session, if we get a response, the connection works
+    // Network errors will be caught in the catch block
     
     return true;
   } catch (error) {

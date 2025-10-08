@@ -3,7 +3,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   Box,
-  Container,
   Paper,
   Typography,
   TextField,
@@ -12,13 +11,15 @@ import {
   CircularProgress,
 } from "@mui/material";
 
-function Login() {
-  const { login } = useAuth();
+function Register() {
+  const { register } = useAuth();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
+    username: "",
     email: "",
     password: "",
+    confirmPassword: "",
   });
 
   const [error, setError] = useState("");
@@ -33,20 +34,27 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Login form submitted", formData);
     setError("");
+
+    // Validation
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      console.log("Calling login...");
-      const result = await login(formData);
-      console.log("Login successful!", result);
-      console.log("Navigating to dashboard...");
-      navigate("/", { replace: true });
+      const { confirmPassword, ...registerData } = formData;
+      await register(registerData);
+      navigate("/");
     } catch (err) {
-      console.error("Login error:", err);
-      console.error("Error response:", err.response);
-      setError(err.response?.data?.message || "Login failed");
+      setError(err.response?.data?.message || "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -69,7 +77,7 @@ function Login() {
             AI SQL Assistant
           </Typography>
           <Typography variant="h6" align="center" gutterBottom>
-            Login
+            Register
           </Typography>
 
           {error && (
@@ -79,6 +87,16 @@ function Login() {
           )}
 
           <form onSubmit={handleSubmit}>
+            <TextField
+              fullWidth
+              label="Username"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
+              margin="normal"
+              required
+            />
+
             <TextField
               fullWidth
               label="Email"
@@ -101,6 +119,17 @@ function Login() {
               required
             />
 
+            <TextField
+              fullWidth
+              label="Confirm Password"
+              name="confirmPassword"
+              type="password"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              margin="normal"
+              required
+            />
+
             <Button
               fullWidth
               type="submit"
@@ -109,14 +138,14 @@ function Login() {
               sx={{ mt: 3, mb: 2 }}
               disabled={loading}
             >
-              {loading ? <CircularProgress size={24} /> : "Login"}
+              {loading ? <CircularProgress size={24} /> : "Register"}
             </Button>
           </form>
 
           <Typography align="center" sx={{ mt: 2 }}>
-            Don't have an account?{" "}
-            <Link to="/register" style={{ textDecoration: "none" }}>
-              Register here
+            Already have an account?{" "}
+            <Link to="/login" style={{ textDecoration: "none" }}>
+              Login here
             </Link>
           </Typography>
         </Paper>
@@ -125,4 +154,4 @@ function Login() {
   );
 }
 
-export default Login;
+export default Register;

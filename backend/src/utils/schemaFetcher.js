@@ -10,48 +10,101 @@ export const fetchDatabaseSchema = async (supabaseUrl, supabaseKey) => {
   try {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch tables from public schema
+    // Fetch tables directly from Supabase's public schema
     const { data: tables, error: tablesError } = await supabase
-      .rpc('get_tables');
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_schema', 'public')
+      .eq('table_type', 'BASE TABLE');
 
     if (tablesError) {
-      throw new Error(`Failed to fetch tables: ${tablesError.message}`);
+      console.error('Error fetching tables:', tablesError);
+      // Fallback: Try to get tables by listing from a known table
+      return await buildSimpleSchemaFallback(supabase);
     }
 
     // Fetch columns for all tables
     const { data: columns, error: columnsError } = await supabase
-      .rpc('get_columns');
+      .from('information_schema.columns')
+      .select('table_name, column_name, data_type, is_nullable, column_default')
+      .eq('table_schema', 'public')
+      .order('table_name')
+      .order('ordinal_position');
 
     if (columnsError) {
-      throw new Error(`Failed to fetch columns: ${columnsError.message}`);
+      console.error('Error fetching columns:', columnsError);
+      return await buildSimpleSchemaFallback(supabase);
     }
 
-    // Fetch foreign key relationships
-    const { data: foreignKeys, error: fkError } = await supabase
-      .rpc('get_foreign_keys');
-
-    if (fkError) {
-      console.warn('Failed to fetch foreign keys:', fkError.message);
-    }
-
-    // Fetch constraints (primary keys, unique, etc.)
-    const { data: constraints, error: constraintsError } = await supabase
-      .rpc('get_constraints');
-
-    if (constraintsError) {
-      console.warn('Failed to fetch constraints:', constraintsError.message);
-    }
+    // Try to fetch foreign keys (may not have permission)
+    const { data: foreignKeys } = await supabase
+      .from('information_schema.key_column_usage')
+      .select('*')
+      .eq('table_schema', 'public')
+      .not('referenced_table_name', 'is', null);
 
     return {
       tables: tables || [],
       columns: columns || [],
       foreignKeys: foreignKeys || [],
-      constraints: constraints || []
+      constraints: []
     };
   } catch (error) {
     console.error('Error fetching database schema:', error);
     throw error;
   }
+};
+
+/**
+ * Fallback method to build schema when information_schema is not accessible
+ * This introspects actual tables in the database
+ */
+const buildSimpleSchemaFallback = async (supabase) => {
+  console.log('📦 Using fallback schema detection method');
+  
+  // List of common table names to check
+  const commonTables = ['students', 'courses', 'enrollments', 'teachers', 
+                        'departments', 'grades', 'assignments', 'users'];
+  
+  const tables = [];
+  const columns = [];
+  
+  for (const tableName of commonTables) {
+    try {
+      // Try to fetch a single row to get column structure
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .limit(1);
+      
+      if (!error && data !== null) {
+        tables.push({ table_name: tableName });
+        
+        // If we got data, extract column names
+        if (data.length > 0) {
+          const row = data[0];
+          Object.keys(row).forEach(columnName => {
+            columns.push({
+              table_name: tableName,
+              column_name: columnName,
+              data_type: typeof row[columnName],
+              is_nullable: 'YES'
+            });
+          });
+        }
+      }
+    } catch (err) {
+      // Table doesn't exist, skip it
+      continue;
+    }
+  }
+  
+  return {
+    tables,
+    columns,
+    foreignKeys: [],
+    constraints: []
+  };
 };
 
 /**
@@ -155,7 +208,6 @@ export const buildSimpleSchema = async (supabaseUrl, supabaseKey) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Try to get list of tables by querying information_schema
-    // This is a workaround if custom RPC functions don't exist
     const { data, error } = await supabase
       .from('information_schema.tables')
       .select('table_name')
@@ -163,19 +215,102 @@ export const buildSimpleSchema = async (supabaseUrl, supabaseKey) => {
       .eq('table_type', 'BASE TABLE');
 
     if (error) {
-      throw error;
+      console.error('Error accessing information_schema:', error);
+      // Use fallback method
+      return await buildDetailedSchemaFromIntrospection(supabase);
     }
 
-    let schemaString = '-- Available Tables:\n';
-    data.forEach(table => {
-      schemaString += `-- ${table.table_name}\n`;
-    });
+    if (!data || data.length === 0) {
+      console.log('No tables found in information_schema, using fallback');
+      return await buildDetailedSchemaFromIntrospection(supabase);
+    }
+
+    // Build schema string with table and column information
+    let schemaString = '-- PostgreSQL Database Schema\n\n';
+    
+    for (const table of data) {
+      const tableName = table.table_name;
+      
+      // Get columns for this table
+      const { data: columns } = await supabase
+        .from('information_schema.columns')
+        .select('column_name, data_type, is_nullable')
+        .eq('table_schema', 'public')
+        .eq('table_name', tableName)
+        .order('ordinal_position');
+      
+      if (columns && columns.length > 0) {
+        schemaString += `Table: ${tableName}\n`;
+        columns.forEach(col => {
+          schemaString += `  - ${col.column_name} (${col.data_type})${col.is_nullable === 'NO' ? ' NOT NULL' : ''}\n`;
+        });
+        schemaString += '\n';
+      }
+    }
 
     return schemaString;
   } catch (error) {
-    console.error('Error building simple schema:', error);
-    return '-- Unable to fetch schema information. Please ensure proper permissions are set.';
+    console.error('Error building schema:', error);
+    // Final fallback
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    return await buildDetailedSchemaFromIntrospection(supabase);
   }
+};
+
+/**
+ * Build schema by introspecting actual tables (fallback method)
+ */
+const buildDetailedSchemaFromIntrospection = async (supabase) => {
+  console.log('📦 Using table introspection to build schema');
+  
+  const commonTables = ['students', 'courses', 'enrollments', 'teachers', 
+                        'departments', 'grades', 'assignments', 'users',
+                        'student_course_performance', 'teacher_course_load'];
+  
+  let schemaString = '-- PostgreSQL Database Schema (Introspected)\n\n';
+  let foundTables = 0;
+  
+  for (const tableName of commonTables) {
+    try {
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .limit(1);
+      
+      if (!error && data !== null) {
+        foundTables++;
+        schemaString += `Table: ${tableName}\n`;
+        
+        if (data.length > 0) {
+          const row = data[0];
+          Object.keys(row).forEach(columnName => {
+            const value = row[columnName];
+            let dataType = 'text';
+            
+            if (typeof value === 'number') {
+              dataType = Number.isInteger(value) ? 'integer' : 'numeric';
+            } else if (typeof value === 'boolean') {
+              dataType = 'boolean';
+            } else if (value instanceof Date) {
+              dataType = 'timestamp';
+            }
+            
+            schemaString += `  - ${columnName} (${dataType})\n`;
+          });
+        }
+        schemaString += '\n';
+      }
+    } catch (err) {
+      // Table doesn't exist, continue
+    }
+  }
+  
+  if (foundTables === 0) {
+    return '-- No tables found. Please check your database connection and permissions.';
+  }
+  
+  console.log(`✅ Found ${foundTables} tables via introspection`);
+  return schemaString;
 };
 
 /**
@@ -187,17 +322,116 @@ export const buildSimpleSchema = async (supabaseUrl, supabaseKey) => {
  */
 export const executeSQLQuery = async (supabaseUrl, supabaseKey, sql) => {
   try {
+    console.log('🔍 Executing SQL:', sql);
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Execute SQL using RPC function (requires setup in Supabase)
-    const { data, error } = await supabase.rpc('execute_sql', { 
-      query: sql 
-    });
+    // Check if query has JOINs or complex features using regex (handles any whitespace/case)
+    const hasJoin = /\bjoin\b/i.test(sql);
+    const hasSubquery = /\(\s*select\b/i.test(sql);
+    const hasGroupBy = /\bgroup\s+by\b/i.test(sql);
+    const hasAggregates = /\b(count|sum|avg|min|max)\s*\(/i.test(sql);
+    
+    const isComplexQuery = hasJoin || hasSubquery || hasGroupBy || hasAggregates;
+    
+    console.log(`📊 Query Analysis: hasJoin=${hasJoin}, hasSubquery=${hasSubquery}, hasGroupBy=${hasGroupBy}, hasAggregates=${hasAggregates}, isComplex=${isComplexQuery}`);
+    
+    if (isComplexQuery) {
+      console.log('🔧 Complex query detected - using RPC function');
+      
+      // Remove trailing semicolon if present (RPC function wraps query in subquery)
+      const cleanedSQL = sql.trim().replace(/;+\s*$/, '');
+      
+      // Try to use RPC function for complex queries
+      const { data, error } = await supabase.rpc('execute_sql', { 
+        query: cleanedSQL 
+      });
+
+      if (error) {
+        // If RPC function doesn't exist, provide helpful error
+        if (error.code === 'PGRST202' || error.message.includes('Could not find')) {
+          throw new Error(
+            'Complex queries require the execute_sql() function in Supabase. ' +
+            'Please run the SQL function found in supabase_execute_sql_function.sql in your Supabase SQL Editor.'
+          );
+        }
+        throw new Error(error.message);
+      }
+
+      console.log(`✅ Query executed successfully. Rows: ${data?.length || 0}`);
+      return {
+        success: true,
+        data: data || [],
+        rowCount: data?.length || 0
+      };
+    }
+    
+    // For simple queries, use Supabase query builder
+    console.log('📊 Simple query - using Supabase query builder');
+    const sqlOriginal = sql.trim();
+    
+    // Extract table name from "FROM tablename"
+    const fromMatch = sqlLower.match(/from\s+(?:public\.)?(\w+)/);
+    if (!fromMatch) {
+      throw new Error('Could not parse table name from SQL query');
+    }
+    
+    const tableName = fromMatch[1];
+    
+    // Extract columns from SELECT clause
+    const selectMatch = sqlOriginal.match(/SELECT\s+(.*?)\s+FROM/i);
+    let columns = '*';
+    
+    if (selectMatch && selectMatch[1].trim() !== '*') {
+      // Parse column list (remove aliases, handle functions)
+      const columnList = selectMatch[1]
+        .split(',')
+        .map(col => {
+          // Remove table prefix (e.g., "students.first_name" -> "first_name")
+          const cleaned = col.trim().replace(/^\w+\./, '');
+          // Remove AS aliases
+          return cleaned.split(/\s+as\s+/i)[0].trim();
+        })
+        .join(',');
+      columns = columnList;
+    }
+    
+    console.log(`📊 Table: ${tableName}, Columns: ${columns}`);
+    let query = supabase.from(tableName).select(columns);
+    
+    // Handle WHERE clauses (basic support)
+    const whereMatch = sqlLower.match(/where\s+(.+?)(?:\s+order\s+by|\s+limit|$)/);
+    if (whereMatch) {
+      const whereClause = whereMatch[1].trim();
+      
+      // Handle simple equality: column = 'value' or column = value
+      const eqMatch = whereClause.match(/(\w+)\s*=\s*'?([^']+)'?/);
+      if (eqMatch) {
+        const [, column, value] = eqMatch;
+        query = query.eq(column, value.replace(/'/g, ''));
+      }
+    }
+    
+    // Handle ORDER BY
+    const orderMatch = sqlLower.match(/order\s+by\s+(\w+)(?:\s+(asc|desc))?/);
+    if (orderMatch) {
+      const column = orderMatch[1];
+      const ascending = !orderMatch[2] || orderMatch[2] === 'asc';
+      query = query.order(column, { ascending });
+    }
+    
+    // Handle LIMIT
+    const limitMatch = sqlLower.match(/limit\s+(\d+)/);
+    if (limitMatch) {
+      query = query.limit(parseInt(limitMatch[1]));
+    }
+    
+    const { data, error } = await query;
 
     if (error) {
       throw new Error(error.message);
     }
 
+    console.log(`✅ Query executed successfully. Rows: ${data?.length || 0}`);
     return {
       success: true,
       data,

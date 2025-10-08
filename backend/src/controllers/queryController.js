@@ -33,10 +33,7 @@ export const prepareSchemaForConnection = [
       const connection = getDecryptedConnection(user, connectionId);
 
       // Generate cache key
-      const cacheKey = cache.generateSchemaKey(
-        req.user._id.toString(),
-        connectionId
-      );
+      const cacheKey = `schema:${req.user._id.toString()}:${connectionId}`;
 
       // Prepare and cache schema
       await prepareSchema(connection, cache, cacheKey);
@@ -89,10 +86,7 @@ export const generateAndRunQuery = [
       const connection = getDecryptedConnection(user, connectionId);
 
       // Generate cache key
-      const cacheKey = cache.generateSchemaKey(
-        req.user._id.toString(),
-        connectionId
-      );
+      const cacheKey = `schema:${req.user._id.toString()}:${connectionId}`;
 
       // Get schema from cache or fetch it
       let schemaContext = cache.get(cacheKey);

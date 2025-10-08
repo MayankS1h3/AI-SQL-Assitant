@@ -21,7 +21,8 @@ export const AuthProvider = ({ children }) => {
             try {
                 setToken(savedToken);
                 const response = await authAPI.getMe();
-                setUser(response.data.user);
+                console.log("GetMe response:", response.data);
+                setUser(response.data.data.user || response.data.user);
             } catch (error) {
                 console.error('Auth initialization failed:', error);
                 localStorage.clear();
@@ -38,7 +39,7 @@ export const AuthProvider = ({ children }) => {
     const register = async (userData) => {
         try {
             const response = await authAPI.register(userData);
-            const { token: newToken, user: newUser } = response.data;
+            const { token: newToken, user: newUser } = response.data.data;
 
             setToken(newToken);
             setUser(newUser);
@@ -54,12 +55,18 @@ export const AuthProvider = ({ children }) => {
     const login = async (credentials) => {
         try {
             const response = await authAPI.login(credentials);
-            const { token: newToken, user: newUser } = response.data;
+            console.log("Login API response:", response);
+            console.log("Response data:", response.data);
+            const { token: newToken, user: newUser } = response.data.data;  // Fixed: added .data
+            console.log("Extracted token:", newToken);
+            console.log("Extracted user:", newUser);
 
             setToken(newToken);
             setUser(newUser);
             localStorage.setItem('token', newToken);
             localStorage.setItem('user', JSON.stringify(newUser));
+            
+            console.log("State updated - token and user set");
 
             return response.data;
         } catch (error) {

@@ -2,9 +2,16 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 import { Box, CircularProgress } from "@mui/material";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
+import Connections from "./pages/Connections";
+import Query from "./pages/Query";
+import History from "./pages/History";
 
 function App() {
-  const { loading, isAuthenticated } = useAuth();
+  const { loading, isAuthenticated, user } = useAuth();
+  
+  console.log("App render - loading:", loading, "isAuthenticated:", isAuthenticated, "user:", user);
 
   if (loading) {
     return (
@@ -24,15 +31,15 @@ function App() {
       {!isAuthenticated ? (
         <>
           <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<div>Register Page</div>} />
+          <Route path="/register" element={<Register />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </>
       ) : (
         <>
-          <Route path="/" element={<div>Dashboard</div>} />
-          <Route path="/connections" element={<div>Connections Page</div>} />
-          <Route path="/query" element={<div>Query Page</div>} />
-          <Route path="/history" element={<div>History Page</div>} />
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/connections" element={<Connections />} />
+          <Route path="/query" element={<Query />} />
+          <Route path="/history" element={<History />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </>
       )}
