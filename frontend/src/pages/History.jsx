@@ -109,18 +109,18 @@ function History() {
                       <Box display="flex" alignItems="center" gap={1} mt={0.5}>
                         <AccessTimeIcon sx={{ fontSize: 16, color: "text.secondary" }} />
                         <Typography variant="caption" color="text.secondary">
-                          {formatDate(item.executedAt)}
+                          {formatDate(item.createdAt)}
                         </Typography>
                         <Chip
-                          label={item.connectionId?.nickname || "Unknown DB"}
+                          label={item.connectionNickname || "Unknown DB"}
                           size="small"
                           sx={{ ml: 1 }}
                         />
                       </Box>
                     </Box>
                     <Chip
-                      label={item.success ? "Success" : "Failed"}
-                      color={item.success ? "success" : "error"}
+                      label={item.status === 'success' ? "Success" : "Failed"}
+                      color={item.status === 'success' ? "success" : "error"}
                       size="small"
                     />
                   </Box>
@@ -141,61 +141,37 @@ function History() {
                           wordBreak: "break-word",
                         }}
                       >
-                        {item.generatedSQL}
+                        {item.generatedSql}
                       </Box>
                     </Paper>
 
+                    {/* Execution Info */}
+                    <Box display="flex" gap={2} mb={2}>
+                      {item.executionTime && (
+                        <Chip
+                          label={`Execution: ${item.executionTime}ms`}
+                          size="small"
+                          variant="outlined"
+                        />
+                      )}
+                      {item.rowCount !== undefined && item.rowCount !== null && (
+                        <Chip
+                          label={`${item.rowCount} rows`}
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                        />
+                      )}
+                    </Box>
+
                     {/* Results or Error */}
-                    {item.success ? (
-                      item.results?.data && item.results.data.length > 0 ? (
-                        <Box>
-                          <Typography variant="subtitle2" gutterBottom>
-                            Results ({item.results.data.length} rows)
-                          </Typography>
-                          <TableContainer
-                            component={Paper}
-                            elevation={1}
-                            sx={{ maxHeight: 300 }}
-                          >
-                            <Table size="small" stickyHeader>
-                              <TableHead>
-                                <TableRow>
-                                  {Object.keys(item.results.data[0]).map((column) => (
-                                    <TableCell key={column}>
-                                      <strong>{column}</strong>
-                                    </TableCell>
-                                  ))}
-                                </TableRow>
-                              </TableHead>
-                              <TableBody>
-                                {item.results.data.slice(0, 10).map((row, rowIndex) => (
-                                  <TableRow key={rowIndex} hover>
-                                    {Object.values(row).map((value, colIndex) => (
-                                      <TableCell key={colIndex}>
-                                        {value === null
-                                          ? "NULL"
-                                          : typeof value === "object"
-                                          ? JSON.stringify(value)
-                                          : String(value)}
-                                      </TableCell>
-                                    ))}
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
-                          </TableContainer>
-                          {item.results.data.length > 10 && (
-                            <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
-                              Showing first 10 of {item.results.data.length} rows
-                            </Typography>
-                          )}
-                        </Box>
-                      ) : (
-                        <Alert severity="info">No results returned</Alert>
-                      )
+                    {item.status === 'success' ? (
+                      <Alert severity="success">
+                        Query executed successfully{item.rowCount !== undefined ? ` (${item.rowCount} rows returned)` : ''}
+                      </Alert>
                     ) : (
                       <Alert severity="error">
-                        {item.error || "Query execution failed"}
+                        {item.errorMessage || "Query execution failed"}
                       </Alert>
                     )}
                   </Box>

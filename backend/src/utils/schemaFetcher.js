@@ -330,10 +330,11 @@ export const executeSQLQuery = async (supabaseUrl, supabaseKey, sql) => {
     const hasSubquery = /\(\s*select\b/i.test(sql);
     const hasGroupBy = /\bgroup\s+by\b/i.test(sql);
     const hasAggregates = /\b(count|sum|avg|min|max)\s*\(/i.test(sql);
+    const hasComparison = /(>|<|>=|<=|<>|!=|\blike\b|\bin\s*\()/i.test(sql);
     
-    const isComplexQuery = hasJoin || hasSubquery || hasGroupBy || hasAggregates;
+    const isComplexQuery = hasJoin || hasSubquery || hasGroupBy || hasAggregates || hasComparison;
     
-    console.log(`📊 Query Analysis: hasJoin=${hasJoin}, hasSubquery=${hasSubquery}, hasGroupBy=${hasGroupBy}, hasAggregates=${hasAggregates}, isComplex=${isComplexQuery}`);
+    console.log(`📊 Query Analysis: hasJoin=${hasJoin}, hasSubquery=${hasSubquery}, hasGroupBy=${hasGroupBy}, hasAggregates=${hasAggregates}, hasComparison=${hasComparison}, isComplex=${isComplexQuery}`);
     
     if (isComplexQuery) {
       console.log('🔧 Complex query detected - using RPC function');
@@ -368,6 +369,7 @@ export const executeSQLQuery = async (supabaseUrl, supabaseKey, sql) => {
     // For simple queries, use Supabase query builder
     console.log('📊 Simple query - using Supabase query builder');
     const sqlOriginal = sql.trim();
+    const sqlLower = sqlOriginal.toLowerCase();
     
     // Extract table name from "FROM tablename"
     const fromMatch = sqlLower.match(/from\s+(?:public\.)?(\w+)/);
