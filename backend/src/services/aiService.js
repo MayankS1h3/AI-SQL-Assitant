@@ -26,7 +26,8 @@ const getAIClient = () => {
   }
   return {
     provider: 'openai',
-    client: new OpenAI({ apiKey })
+    client: new OpenAI({ apiKey })  
+    
   };
 };
 
